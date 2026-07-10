@@ -20,7 +20,11 @@ create table matches (
   away_team text not null,
   allow_draw boolean default true,
   result text check (result in ('home','draw','away')),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  next_match_id uuid references matches(id),
+  next_slot text check (next_slot in ('home','away')),
+  loser_next_match_id uuid references matches(id),
+  loser_next_slot text check (loser_next_slot in ('home','away'))
 );
 
 create table predictions (
@@ -49,8 +53,38 @@ create policy "public write predictions" on predictions for all using (true) wit
 insert into matches (match_date,kickoff_at,stage,home_team,away_team,allow_draw) values
 ('2026-07-10','2026-07-10 22:00:00+03','Quarterfinal','Spain','Belgium',false),
 ('2026-07-11','2026-07-11 00:00:00+03','Quarterfinal','Norway','England',false),
-('2026-07-11','2026-07-11 04:00:00+03','Quarterfinal','Winner R16 A','Winner R16 B',false),
+('2026-07-11','2026-07-11 04:00:00+03','Quarterfinal','France','Morocco',false),
+('2026-07-11','2026-07-11 22:00:00+03','Quarterfinal','Argentina','Switzerland',false),
 ('2026-07-14','2026-07-14 22:00:00+03','Semifinal','Winner QF1','Winner QF2',false),
 ('2026-07-15','2026-07-15 22:00:00+03','Semifinal','Winner QF3','Winner QF4',false),
 ('2026-07-18','2026-07-18 00:00:00+03','Third Place','Loser SF1','Loser SF2',false),
 ('2026-07-19','2026-07-19 22:00:00+03','Final','Winner SF1','Winner SF2',false);
+
+with qf as (
+  select id, row_number() over (order by kickoff_at) rn
+  from matches where stage='Quarterfinal'
+), sf as (
+  select id, row_number() over (order by kickoff_at) rn
+  from matches where stage='Semifinal'
+)
+update matches m
+set next_match_id = sf.id,
+    next_slot = case when qf.rn in (1,3) then 'home' else 'away' end
+from qf join sf on sf.rn = ceil(qf.rn/2.0)
+where m.id = qf.id;
+
+with sf as (
+  select id, row_number() over (order by kickoff_at) rn
+  from matches where stage='Semifinal'
+), fin as (
+  select id from matches where stage='Final'
+), third as (
+  select id from matches where stage='Third Place'
+)
+update matches m
+set next_match_id = fin.id,
+    next_slot = case when sf.rn=1 then 'home' else 'away' end,
+    loser_next_match_id = third.id,
+    loser_next_slot = case when sf.rn=1 then 'home' else 'away' end
+from sf, fin, third
+where m.id = sf.id;

@@ -10,7 +10,17 @@ export default function Admin(){
  useEffect(()=>{if(ok)load()},[ok])
  function unlock(){ if(pin==='1234') setOk(true); else alert('Wrong PIN. Change the PIN in the deployed app later if needed.') }
  async function add(){ if(!form.home_team||!form.away_team||!form.kickoff_at) return alert('Fill all fields'); const {error}=await supabase.from('matches').insert({...form,match_date:form.kickoff_at.slice(0,10)}); if(error) alert(error.message); else {setForm(empty);load()} }
- async function result(id:string,result:string){await supabase.from('matches').update({result:result||null}).eq('id',id); load()}
+ async function result(id:string,result:string){
+  const m=matches.find(x=>x.id===id)
+  await supabase.from('matches').update({result:result||null}).eq('id',id)
+  if(m&&(result==='home'||result==='away')){
+   const winner=result==='home'?m.home_team:m.away_team
+   const loser=result==='home'?m.away_team:m.home_team
+   if(m.next_match_id&&m.next_slot) await supabase.from('matches').update({[m.next_slot==='home'?'home_team':'away_team']:winner}).eq('id',m.next_match_id)
+   if(m.loser_next_match_id&&m.loser_next_slot) await supabase.from('matches').update({[m.loser_next_slot==='home'?'home_team':'away_team']:loser}).eq('id',m.loser_next_match_id)
+  }
+  load()
+ }
  async function del(id:string){if(confirm('Delete match?')){await supabase.from('matches').delete().eq('id',id);load()}}
  async function exportCsv(){const [{data:users},{data:preds}]=await Promise.all([supabase.from('players').select('*'),supabase.from('predictions').select('*')]); const blob=new Blob([JSON.stringify({users,preds,matches},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='worldcup-export.json'; a.click()}
  if(!ok) return <main className="min-h-screen grid place-items-center p-4"><section className="card p-6 max-w-md w-full"><h1 className="text-3xl font-black mb-3">Admin</h1><p className="text-white/60 mb-4">Enter admin PIN.</p><input value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" type="password"/><button className="btn mt-3 w-full" onClick={unlock}>Open Admin</button><p className="text-white/40 text-xs mt-3">Default PIN: 1234. Change it in code before public use.</p></section></main>

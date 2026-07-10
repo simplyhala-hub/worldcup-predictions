@@ -3,11 +3,11 @@ drop table if exists matches cascade;
 drop table if exists players cascade;
 
 create extension if not exists "pgcrypto";
+create extension if not exists "citext";
 
 create table players (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
-  device_id text not null unique,
+  name citext not null unique,
   created_at timestamptz default now()
 );
 

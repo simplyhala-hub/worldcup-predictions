@@ -15,5 +15,5 @@ export type Match = {
   allow_draw: boolean
   result: 'home' | 'draw' | 'away' | null
 }
-export type Player = { id: string; name: string; device_id: string; created_at: string }
+export type Player = { id: string; name: string; created_at: string }
 export type Prediction = { id: string; user_id: string; match_id: string; pick: 'home'|'draw'|'away'; created_at: string }

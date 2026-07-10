@@ -7,11 +7,9 @@ type Pick = 'home'|'draw'|'away'
 
 type Row = Player & { points:number; total:number; correct:number; accuracy:number }
 
-function deviceId(){
+function savedName(){
   if(typeof window==='undefined') return ''
-  let id=localStorage.getItem('wc_device_id')
-  if(!id){id=crypto.randomUUID();localStorage.setItem('wc_device_id',id)}
-  return id
+  return localStorage.getItem('wc_player_name')||''
 }
 function label(m:Match,p:Pick){return p==='home'?m.home_team:p==='away'?m.away_team:'Draw'}
 function locked(m:Match){return Date.now()>=new Date(m.kickoff_at).getTime()}
@@ -26,23 +24,24 @@ export default function Home(){
   const boardRef=useRef<HTMLDivElement>(null)
 
   async function load(){
-    const did=deviceId()
+    const stored=savedName()
     const [{data:ms},{data:us},{data:ps}] = await Promise.all([
       supabase.from('matches').select('*').order('kickoff_at'),
       supabase.from('players').select('*').order('created_at'),
       supabase.from('predictions').select('*')
     ])
     setMatches((ms||[]) as Match[]); setPlayers((us||[]) as Player[]); setPreds((ps||[]) as Prediction[])
-    const player=(us||[]).find((u:any)=>u.device_id===did) as Player|undefined
-    setMe(player||null); setLoading(false)
+    const player=(us||[]).find((u:any)=>u.name.toLowerCase()===stored.toLowerCase()) as Player|undefined
+    setMe(stored&&player?player:null); setLoading(false)
   }
-  useEffect(()=>{load(); const t=setInterval(load,30000); return()=>clearInterval(t)},[])
+  useEffect(()=>{setName(savedName()); load(); const t=setInterval(load,30000); return()=>clearInterval(t)},[])
 
   async function saveName(){
-    if(!name.trim()) return alert('Please enter your name')
-    const did=deviceId()
-    const {data,error}=await supabase.from('players').upsert({device_id:did,name:name.trim()},{onConflict:'device_id'}).select().single()
+    const trimmed=name.trim()
+    if(!trimmed) return alert('Please enter your name')
+    const {data,error}=await supabase.from('players').upsert({name:trimmed},{onConflict:'name'}).select().single()
     if(error) return alert(error.message)
+    localStorage.setItem('wc_player_name',trimmed)
     setMe(data as Player); await load()
   }
   async function choose(m:Match,pick:Pick){
@@ -71,7 +70,7 @@ export default function Home(){
   return <main className="max-w-6xl mx-auto p-4 md:p-8">
     <section className="py-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5">
       <div><p className="text-yellow-300 font-black tracking-[.22em] uppercase">Office League</p><h1 className="text-4xl md:text-7xl font-black leading-none">World Cup Predictions</h1><p className="text-white/65 mt-4 text-lg">Pick before kickoff. 1 correct prediction = 1 point.</p></div>
-      {me && <button className="ghost" onClick={()=>setMe(null)}>Change name</button>}
+      {me && <button className="ghost" onClick={()=>{localStorage.removeItem('wc_player_name');setName('');setMe(null)}}>Change name</button>}
     </section>
 
     {!me && <section className="card p-6 max-w-xl"><h2 className="text-2xl font-black mb-2">Enter your name</h2><p className="text-white/60 mb-4">Use the same name until the final.</p><div className="flex gap-2 flex-col sm:flex-row"><input value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/><button className="btn" onClick={saveName}>Start</button></div></section>}

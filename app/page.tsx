@@ -12,7 +12,7 @@ function savedName(){
   return localStorage.getItem('wc_player_name')||''
 }
 function label(m:Match,p:Pick){return p==='home'?m.home_team:p==='away'?m.away_team:'Draw'}
-function locked(m:Match){return Date.now()>=new Date(m.kickoff_at).getTime()}
+function locked(m:Match){return m.result!=null||Date.now()>=new Date(m.kickoff_at).getTime()}
 
 export default function Home(){
   const [name,setName]=useState('')
